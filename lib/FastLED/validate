@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# validate - FastLED Validation Test Wrapper
+#
+# Runs the Validation.ino sketch with proper --expect and --fail-on patterns
+# to catch ISR failures, hardware issues, and test matrix errors.
+#
+# Usage:
+#   bash validate --parlio            # Run PARLIO driver test (auto-detect environment)
+#   bash validate esp32s3 --parlio    # Run on esp32s3 environment
+#   bash validate --all               # Test all drivers
+#   bash validate --timeout 120       # Override timeout
+#   bash validate --skip-lint         # Skip linting phase
+#   bash validate --help              # Show help
+
+set -euo pipefail
+
+# Help message
+show_help() {
+    cat <<EOF
+FastLED Validation Test Wrapper
+
+Usage:
+  bash validate [ENVIRONMENT] --<driver> [OPTIONS]
+
+Positional Arguments:
+  ENVIRONMENT         Optional PlatformIO environment (e.g., esp32s3, esp32dev)
+                      If omitted, auto-detects from attached device
+
+Driver Selection (MANDATORY - must specify at least one):
+  --parlio            Test parallel I/O driver
+  --rmt               Test RMT (Remote Control) driver
+  --spi               Test SPI driver
+  --uart              Test UART driver
+  --i2s               Test I2S LCD_CAM driver (ESP32-S3 only)
+  --all               Test all drivers (equivalent to --parlio --rmt --spi --uart --i2s)
+  --simd              Test SIMD operations only (no LED drivers needed)
+
+Options:
+  -h, --help          Show this help message
+  --timeout SECONDS   Override default timeout (default: 60s)
+  --skip-lint         Skip C++ linting phase (faster iteration)
+  --no-expect         Clear default --expect patterns (use custom only)
+  --no-fail-on        Clear default --fail-on pattern (use custom only)
+  --verbose, -v       Enable verbose output
+
+Description:
+  Runs the Validation.ino sketch with comprehensive pattern matching and
+  JSON-RPC driver selection. Features include:
+
+  - GPIO PRE-TEST: Verifies TX-RX jumper wire connection before running tests
+  - PATTERN MATCHING: Validates hardware setup, driver availability, test results
+  - EARLY EXIT: Stops when test suite completes (no need to wait for timeout)
+  - ERROR DETECTION: Catches ISR hangs, device crashes, and test failures
+
+Examples:
+  bash validate --parlio                    # Auto-detect env, test PARLIO driver
+  bash validate esp32s3 --parlio            # Run on esp32s3, test PARLIO driver
+  bash validate --rmt --spi                 # Test RMT and SPI drivers
+  bash validate --all                       # Test all drivers
+  bash validate --parlio --skip-lint        # Skip linting for faster iteration
+  bash validate --all --timeout 120         # Longer timeout
+
+Exit Codes:
+  0   Success (all patterns found, no failures)
+  1   Failure (GPIO pre-test failed, missing patterns, ERROR detected, etc.)
+  130 User interrupt (Ctrl+C)
+
+See Also:
+  - examples/Validation/Validation.ino - Validation sketch documentation
+  - CLAUDE.md Section "Live Device Testing (AI Agents)" - Usage guidelines
+
+EOF
+}
+
+# Check for help flag first
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+    esac
+done
+
+# Run the Python validation script with all arguments
+exec uv run ci/validate.py "$@"
